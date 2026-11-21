@@ -54,8 +54,8 @@ const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
 const GREENS = ['#5fd38a','#7be0a0','#3fb872','#9be8a8'];
 const TYPES = {
   wild:  {n:11, R:[0.34,0.48], pal:['#ff6f91','#ffd166','#7a9bff','#b388ff','#ff9a76','#f4f1ff','#ff8fd0'], core:'#ffe9a8'},
-  peony: {n:14, R:[0.30,0.38], pal:['#ff9ec4','#ffc2d9','#fff0f5','#ff7fae','#ffd1b8'], core:'#ff5c93'},
-  rose:  {n:15, R:[0.30,0.38], pal:['#ff3b5c','#e8284f','#ff6b81','#ff4d6d','#ffb703','#f8f0ff'], core:'#b3123a'}
+  peony: {n:11, R:[0.36,0.46], pal:['#ff9ec4','#ffc2d9','#fff0f5','#ff7fae','#ffd1b8'], core:'#ff5c93'},
+  rose:  {n:12, R:[0.34,0.44], pal:['#ff3b5c','#e8284f','#ff6b81','#ff4d6d','#ffb703','#f8f0ff'], core:'#b3123a'}
 };
 
 
@@ -78,20 +78,42 @@ function layered(put,R,col,core,o){
           const ruf=1+o.ruf*Math.sin(o.rufn*th+l*1.7)*s;
           const rho=(rb+ext*s)*ruf;
           const lift=hb+o.curl(lf,s)+o.rip*R*Math.sin(o.rufn*0.7*th+l)*s;
-          const f=o.f0+o.f1*s-0.14*phi*phi+lf*o.lfDark;
+          let f=o.f0+o.f1*s-0.14*phi*phi+lf*o.lfDark;
+          if(s>0.88) f+=0.22;
+          if(Math.abs(phi)>0.86) f-=0.28;
           const ch=RAMP[Math.max(0,Math.min(6,Math.round((f-0.5)/0.75*6)))];
           put(rho,th,lift,ch,shade(col,f));
         }
       }
     }
   }
-  // серцевина
-  for(let k=0;k<60;k++){
-    const r=R*0.18*Math.sqrt(k/60), th=k*2.39996;
-    put(r,th,o.hb(0)+R*0.05,'@',shade(core,0.9));
+  // центр
+  if(o.center==='spiral'){
+    for(let k=0;k<220;k++){
+      const t=k/220, th=t*3*6.28318, r=R*(0.04+0.30*t);
+      const f=0.5+0.55*(Math.floor(t*7)%2)+0.2*t;
+      put(r,th,o.hb(0)+R*(0.26-0.14*t),RAMP[Math.max(0,Math.min(6,Math.round((f-0.5)/0.75*6)))],shade(col,f));
+    }
+  } else {
+    for(let k=0;k<70;k++){
+      const r=R*0.16*Math.sqrt(k/70), th=k*2.39996;
+      put(r,th,o.hb(0)+R*0.08,'@',shade(core,0.8));
+    }
+    for(let k=0;k<26;k++){
+      const th=k/26*6.28318;
+      put(R*0.24,th,o.hb(0)+R*0.12,'*',core);
+    }
   }
 }
 
+const ROSE_COLORS=['#c8102e','#8e0b24','#f48fb1','#e8588c','#fbf1e6','#f6e3b4','#f5c431','#f8a58a','#ef6c57','#f28c28','#bfa2db','#5e0b20'];
+const PEONY_COLORS=['#f8c8d4','#f29bb8','#e0568a','#f6907b','#fdf2f2','#b8326e','#b01c3c','#fbd3b8','#d9a3c9'];
+function tone(hex,k){
+  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  if(k<1){r*=k;g*=k;b*=k}else{const t=Math.min(1,k-1);r+=(255-r)*t;g+=(255-g)*t;b+=(255-b)*t}
+  const h=v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');
+  return '#'+h(r)+h(g)+h(b);
+}
 let pts = [];
 let extent = 4.8;
 function hsl(h,s,l){h=((h%360)+360)%360;s/=100;l/=100;const a=s*Math.min(l,1-l);
@@ -106,8 +128,13 @@ function build(type){
   const hue0=rnd()*360, scheme=rnd();
   const pal=[0,1,2,3,4,5].map(k=>hsl(hue0+(scheme<.5?k*(8+rnd()*10):k*(30+rnd()*40)), 62+rnd()*28, 56+rnd()*16));
   const core=hsl(hue0+(rnd()<.5?0:40),80,32);
+  const bases=[];
+  if(type!=='wild'){
+    const PAL=type==='rose'?ROSE_COLORS:PEONY_COLORS, nb=rnd()<0.55?1:2;
+    for(let k=0;k<nb;k++) bases.push(PAL[Math.floor(rnd()*PAL.length)]);
+  }
   const sz=0.75+rnd()*0.65;
-  const N=Math.min(20,Math.max(6,Math.round(T.n/(sz*sz))));
+  const N=Math.min(type==='wild'?16:12,Math.max(6,Math.round(T.n/(sz*sz))));
   const spread=1.5+rnd()*0.9, topH=0.35+rnd()*0.6, lean=0.5+rnd()*1.0;
   extent=(spread+0.9)*2;
   const op=0.6+rnd()*0.9, wideV=1.1+rnd()*0.3, rufV=0.6+rnd()*1.0;
@@ -118,7 +145,12 @@ function build(type){
     const a = i*2.39996;
     const r = 0.2 + (spread-0.2)*Math.sqrt((i+0.5)/N);
     const H = [Math.cos(a)*r, 0.55 + topH*(1-(r/(spread+0.2))**2) + (rnd()-0.5)*0.15, Math.sin(a)*r];
-    const color = pal[i % pal.length];
+    let color = pal[i % pal.length], fcore = core;
+    if(type!=='wild'){
+      const b=bases[(rnd()<0.72)?0:(bases.length-1)];
+      color=tone(b,0.84+rnd()*0.4);
+      fcore=type==='peony'?'#f2c14e':tone(color,0.5);
+    }
     const R = (T.R[0] + rnd()*(T.R[1]-T.R[0]))*sz;
 
     // стебло
@@ -159,21 +191,21 @@ function build(type){
         }
       }
     } else if (type==='peony'){
-      layered(put, R, color, core, {
-        L:7, pc:l=>pcP+(l%3), phase:0.9, wide:wideV+0.1,
-        rb:lf=>R*(0.12+0.85*Math.pow(lf,0.9)),
+      layered(put, R, color, fcore, {
+        L:7, pc:l=>pcP+(l%3), phase:0.9, wide:wideV+0.1, center:'stamens',
+        rb:lf=>R*(0.14+0.84*Math.pow(lf,0.9)),
         ext:lf=>R*(0.40+0.30*lf),
-        hb:lf=>R*0.34*op*Math.pow(1-lf,1.1),
-        curl:(lf,s)=>R*op*(0.10*s*(1-lf)-0.10*s*s*lf),
-        ruf:0.10*rufV, rufn:11, rip:0.05, f0:0.62, f1:0.55, lfDark:0.12, S:7, F:8});
+        hb:lf=>R*0.40*op*Math.pow(1-lf,1.1),
+        curl:(lf,s)=>R*op*(0.12*s*(1-lf)-0.10*s*s*lf),
+        ruf:0.10*rufV, rufn:11, rip:0.05, f0:0.55, f1:0.62, lfDark:0.12, S:7, F:8});
     } else { // троянда
-      layered(put, R, color, core, {
-        L:6, pc:l=>pcR, phase:0.63, wide:wideV,
-        rb:lf=>R*(0.18+0.80*lf),
+      layered(put, R, color, fcore, {
+        L:7, pc:l=>pcR, phase:0.63, wide:wideV, center:'spiral',
+        rb:lf=>R*(0.20+0.78*lf),
         ext:lf=>R*(0.22+0.40*lf),
-        hb:lf=>R*0.42*op*Math.pow(1-lf,1.1),
-        curl:(lf,s)=>R*op*(0.10*s*(0.8-lf)),
-        ruf:0.05*rufV, rufn:7, rip:0.03, f0:0.58, f1:0.62, lfDark:0.10, S:8, F:9});
+        hb:lf=>R*0.46*op*Math.pow(1-lf,1.1),
+        curl:(lf,s)=>R*op*(0.12*s*(0.8-lf)),
+        ruf:0.05*rufV, rufn:7, rip:0.03, f0:0.50, f1:0.72, lfDark:0.10, S:9, F:10});
     }
   }
 
